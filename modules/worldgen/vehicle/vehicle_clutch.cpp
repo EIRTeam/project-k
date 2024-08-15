@@ -17,9 +17,6 @@ void VehicleClutch::_bind_methods() {
   ClassDB::bind_method(D_METHOD("get_friction"), &VehicleClutch::get_friction);
   ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "friction"), "set_friction",
                "get_friction");
-  ClassDB::bind_method(D_METHOD("get_clutch_torque"),
-                       &VehicleClutch::get_clutch_torque);
-  ClassDB::bind_method(D_METHOD("process"), &VehicleClutch::process);
 }
 
 Vector2 VehicleClutch::get_reaction_torques(float p_av1, float p_av2,
