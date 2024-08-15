@@ -7,6 +7,11 @@
 #include "poisson_disk_sampling.h"
 #include "worldgen/quadtree.h"
 #include "worldgen/road_astar.h"
+#include "worldgen/vehicle/vehicle.h"
+#include "worldgen/vehicle/vehicle_clutch.h"
+#include "worldgen/vehicle/vehicle_debugger.h"
+#include "worldgen/vehicle/vehicle_engine.h"
+#include "worldgen/vehicle/vehicle_settings.h"
 #include "worldgen/worldgen_scatter.h"
 #include "worldgen_manager.h"
 #include "worldgen_composer.h"
@@ -29,6 +34,18 @@ void initialize_worldgen_module(ModuleInitializationLevel p_level) {
     GDREGISTER_CLASS(WorldgenScatterScene);
     GDREGISTER_CLASS(WorldgenScatterLayer);
     GDREGISTER_CLASS(WorldgenScatter);
+    GDREGISTER_CLASS(VehicleEngine);
+    GDREGISTER_CLASS(VehicleSettings);
+    GDREGISTER_CLASS(VehicleEngineSettings);
+    GDREGISTER_CLASS(VehicleDifferentialSettings);
+    GDREGISTER_CLASS(VehicleSuspensionCornerSettings);
+    GDREGISTER_CLASS(VehicleSuspensionCorner);
+    GDREGISTER_ABSTRACT_CLASS(VehicleTireSettings);
+    GDREGISTER_CLASS(VehicleCurveModelTireSettings);
+    GDREGISTER_CLASS(VehicleDrivetrainSettings);
+    GDREGISTER_CLASS(HBVehicle);
+    GDREGISTER_CLASS(VehicleDebugger);
+    GDREGISTER_CLASS(VehicleClutch);
 
     GLOBAL_DEF("kgame/chunk_size", 32);
     GLOBAL_DEF("kgame/cull_quadtree_subdiv", 2);
