@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/delfrrr/delaunator-cpp.git
+	branch = master
+	commit = c1521f6e879881232dcddabd6c2ddb6187e8714b
+	parent = bd0a6be2d254e113e1b22971f98f69d1acce3d65
+	method = merge
+	cmdver = 0.4.9
