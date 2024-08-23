@@ -13,42 +13,28 @@ class WorldgenBilinearArray : public RefCounted {
     int dimension;
 public:
     float sample(const Vector2 &p_point) {
-        int width = dimension;
-        int height = dimension;
-        Vector2 clamped_sample_point = p_point.clamp(Vector2(), Vector2(dimension-1, dimension-1));
+        Vector2 sample_point = p_point.round();
+        Vector2i sample_2 = Vector2i(sample_point.x, sample_point.y).clampi(0, dimension-1);
+        Vector2i sample_1 = (sample_2 - Vector2i(1, 1)).clampi(0, dimension-1);
+        Vector2 sample_weights; 
+        sample_weights.x = Math::inverse_lerp(sample_1.x + 0.5f, sample_2.x + 0.5f, p_point.x);
+        sample_weights.y = Math::inverse_lerp(sample_1.y + 0.5f, sample_2.y + 0.5f, p_point.y);
 
-        // Get the integer parts of the sample coordinates
-        int x0 = (int)clamped_sample_point.x;
-        int y0 = (int)clamped_sample_point.y;
-        
-        // Get the fractional parts of the sample coordinates
-        float tx = clamped_sample_point.x - x0;
-        float ty = clamped_sample_point.y - y0;
+        sample_weights = sample_weights.clampf(0.0, 1.0f);
 
-        // Ensure the coordinates for the surrounding points are within bounds
-        int x1 = x0 + 1 < width ? x0 + 1 : x0;
-        int y1 = y0 + 1 < height ? y0 + 1 : y0;
+        float value_top_x0 = data[sample_1.x + sample_1.y * dimension];
+        float value_top_x1 = data[sample_2.x + sample_1.y * dimension];
+        float value_bottom_x0 = data[sample_1.x + sample_2.y * dimension];
+        float value_bottom_x1 = data[sample_2.x + sample_2.y * dimension];
 
-        // Retrieve the values at the four corners
-        float v00 = data[y0 * width + x0];
-        float v10 = data[y0 * width + x1];
-        float v01 = data[y1 * width + x0];
-        float v11 = data[y1 * width + x1];
+        float top_x_interp = Math::lerp(value_top_x0, value_top_x1, sample_weights.x);
+        float bottom_x_interp = Math::lerp(value_bottom_x0, value_bottom_x1, sample_weights.x);
 
-        // Perform bilinear interpolation
-        float i0 = Math::lerp(v00, v10, tx);
-        float i1 = Math::lerp(v01, v11, tx);
-        float value = Math::lerp(i0, i1, ty);
-
-        if (value < -200) {
-            print_line("COCK");
-        }
-
-        return value;
+        return Math::lerp(top_x_interp, bottom_x_interp, sample_weights.y);
     }
 
     static void _bind_methods() {
-        ClassDB::bind_static_method("WorldgenHeightmap", D_METHOD("create", "data", "dimension"), &WorldgenBilinearArray::create);
+        ClassDB::bind_static_method("WorldgenBilinearArray", D_METHOD("create", "data", "dimension"), &WorldgenBilinearArray::create);
         ClassDB::bind_method(D_METHOD("sample", "point"), &WorldgenBilinearArray::sample);
     }
 public:
