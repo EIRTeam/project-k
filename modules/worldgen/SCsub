@@ -12,6 +12,7 @@ thirdparty_obj = []
 thirdparty_dir = "thirdparty/"
 thirdparty_sources = [
     "sdnoise.c",
+    "alpha_model_road_generator/src/alpha_model.cpp",
 ]
 thirdparty_sources = [thirdparty_dir + file for file in thirdparty_sources]
 
@@ -19,6 +20,7 @@ env_worldgen.Append(CPPDEFINES=["TF_DISABLE_EXCEPTION_HANDLING"])
 
 env_thirdparty = env_worldgen.Clone()
 env_thirdparty.Prepend(CPPPATH=[thirdparty_dir])
+env_thirdparty.Prepend(CPPPATH=[thirdparty_dir + "alpha_model_road_generator/thirdparty/delaunator-cpp/include"])
 env_thirdparty.disable_warnings()
 env_thirdparty.add_source_files(thirdparty_obj, thirdparty_sources)
 env.modules_sources += thirdparty_obj
@@ -28,7 +30,12 @@ env.modules_sources += thirdparty_obj
 module_obj = []
 
 env_worldgen.add_source_files(module_obj, "*.cpp")
+env_worldgen.add_source_files(module_obj, "wind/*.cpp")
+env_worldgen.add_source_files(module_obj, "roads/*.cpp")
+env_worldgen.Prepend(CPPPATH=[thirdparty_dir + "alpha_model_road_generator/src"])
+
 env_worldgen.add_source_files(module_obj, "vehicle/*.cpp")
+env_worldgen.add_source_files(module_obj, "layer_system/*.cpp")
 env.modules_sources += module_obj
 
 # Needed to force rebuilding the module files when the thirdparty library is updated.

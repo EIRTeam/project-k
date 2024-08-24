@@ -1,5 +1,6 @@
 #include "vehicle_debugger.h"
 #include "core/config/engine.h"
+#include "core/io/file_access.h"
 #include "core/object/class_db.h"
 #include "core/string/print_string.h"
 #include "imgui/thirdparty/imgui/imgui.h"
@@ -9,14 +10,20 @@
 #include "scene/resources/material.h"
 #include "scene/resources/mesh.h"
 #include "worldgen/vehicle/vehicle.h"
+#include "worldgen/vehicle/vehicle_drivetrain.h"
 
 Vector<float> VehicleDebugger::engine_torques;
 Vector<float> VehicleDebugger::drive_torques;
 Vector<float> VehicleDebugger::gearbox_shaft_speeds;
+Vector<float> VehicleDebugger::clutch_states;
+Vector<float> VehicleDebugger::differential_states;
+
+static float timed = 0.0f;
 
 void VehicleDebugger::_notification(int p_what) {
   switch (p_what) {
   case NOTIFICATION_READY: {
+    fa = FileAccess::open("res://plot.txt", FileAccess::WRITE);
     im.instantiate();
     MeshInstance3D *mi = memnew(MeshInstance3D);
     mi->set_as_top_level(true);
@@ -32,7 +39,7 @@ void VehicleDebugger::_notification(int p_what) {
     if (!vehicle) {
       return;
     }
-
+    timed += get_process_delta_time();
     im->clear_surfaces();
     im->surface_begin(Mesh::PRIMITIVE_LINES);
     for (int i = 0; i < HBVehicle::WHEEL_MAX; i++) {
@@ -82,6 +89,11 @@ void VehicleDebugger::_notification(int p_what) {
       if (gearbox_shaft_speeds.size() > 120) {
         gearbox_shaft_speeds.remove_at(0);
       }
+      clutch_states.push_back(vehicle->clutch->get_locked() ? 1.0f : 0.0f);
+      if (clutch_states.size() > 120) {
+        clutch_states.remove_at(0);
+      }
+
       ImGui::Text("engine_angular_vel %.2f",
                   vehicle->engine->get_angular_velocity());
       ImGui::Text("clutch_reaction_torque %.2f",
@@ -99,6 +111,18 @@ void VehicleDebugger::_notification(int p_what) {
       ImGui::PlotLines("Gearbox shaft speed", gearbox_shaft_speeds.ptr(),
                        gearbox_shaft_speeds.size(), 0, nullptr, FLT_MAX,
                        FLT_MAX, ImVec2(0, 100));
+      ImGui::PlotLines("Clutch state", clutch_states.ptr(),
+                       clutch_states.size(), 0, nullptr, FLT_MAX,
+                       FLT_MAX, ImVec2(0, 100));
+      Vector<String> telemetry_values;
+      telemetry_values.push_back(vformat("%f", timed));
+      telemetry_values.push_back(vformat("%f", gearbox_shaft_speeds[gearbox_shaft_speeds.size()-1]));
+      telemetry_values.push_back(vformat("%f", clutch_states[clutch_states.size()-1]));
+      telemetry_values.push_back(vformat("%f", engine_torques[engine_torques.size()-1]));
+      telemetry_values.push_back(vformat("%f", drive_torques[drive_torques.size()-1]));
+      telemetry_values.push_back(vformat("%f", vehicle->clutch_reaction_torque));
+      telemetry_values.push_back(vformat("%f", vehicle->engine->get_rpm()));
+      fa->store_csv_line(telemetry_values);
     }
     ImGui::End();
   } break;

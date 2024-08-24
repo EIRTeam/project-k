@@ -158,8 +158,7 @@ void VehicleDrivetrain::process(const DrivetrainProcessParams &p_process_params,
   const float gear_ratio_sq = Math::abs(gear_ratio) * Math::abs(gear_ratio);
 
   float drive_inertia = (p_process_params.engine_inertia +
-                         gear_ratio_sq * settings->get_inertia()) *
-                        (1.0f - p_process_params.clutch_input);
+                         gear_ratio_sq * settings->get_inertia());
   float drive_torque = p_process_params.drive_torque * gear_ratio;
 
   if (settings->get_drive_type() == VehicleDrivetrainSettings::RWD) {

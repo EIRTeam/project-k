@@ -7,7 +7,7 @@
 #include "core/string/print_string.h"
 #include "core/templates/safe_refcount.h"
 #include "core/typedefs.h"
-#include "worldgen/heightmap.h"
+#include "worldgen/bilinear_array.h"
 #include "worldgen/quadtree.h"
 class RoadAStar : public AStar2D {
     GDCLASS(RoadAStar, AStar2D);
@@ -20,7 +20,7 @@ public:
 		NORMAL
 	};
     struct RoadAStarSettings {
-        Ref<WorldgenBilinearArray> heightmap;
+        Ref<BilinearVector> heightmap;
 		RoadAStarNodeConnectionMode connection_mode = RoadAStarNodeConnectionMode::NORMAL;
 		int astar_resolution = 8;
 		float power = 1.5f;

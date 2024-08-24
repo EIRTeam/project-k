@@ -6,6 +6,7 @@
 class VehicleClutch : public RefCounted {
   GDCLASS(VehicleClutch, RefCounted);
   float friction = 250.0f;
+  float clutch_stiffness = 1.0f;
   bool locked = true;
 
 protected:
@@ -23,6 +24,9 @@ public:
 
   float get_friction() const;
   void set_friction(float p_friction);
+
+  float get_clutch_stiffness() const { return clutch_stiffness; }
+  void set_clutch_stiffness(float clutch_stiffness_) { clutch_stiffness = clutch_stiffness_; }
 };
 
 #endif // VEHICLE_CLUTCH_H

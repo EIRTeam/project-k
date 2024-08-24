@@ -1,14 +1,16 @@
-#ifndef HEIGHTMAP_H
-#define HEIGHTMAP_H
+#ifndef BILINEAR_ARRAY_H
+#define BILINEAR_ARRAY_H
 
 #include "core/error/error_macros.h"
 #include "core/object/class_db.h"
 #include "core/object/ref_counted.h"
 #include "core/string/print_string.h"
 #include "core/templates/vector.h"
+#include "core/typedefs.h"
 
-class WorldgenBilinearArray : public RefCounted {
-    GDCLASS(WorldgenBilinearArray, RefCounted);
+
+class BilinearVector : public RefCounted {
+    GDCLASS(BilinearVector, RefCounted);
     LocalVector<float> data;
     int dimension;
 public:
@@ -34,8 +36,8 @@ public:
     }
 
     static void _bind_methods() {
-        ClassDB::bind_static_method("WorldgenBilinearArray", D_METHOD("create", "data", "dimension"), &WorldgenBilinearArray::create);
-        ClassDB::bind_method(D_METHOD("sample", "point"), &WorldgenBilinearArray::sample);
+        ClassDB::bind_static_method("WorldgenBilinearArray", D_METHOD("create", "data", "dimension"), &BilinearVector::create);
+        ClassDB::bind_method(D_METHOD("sample", "point"), &BilinearVector::sample);
     }
 public:
     void set_pixel(const Vector2i &p_pixel, float p_height) {
@@ -54,10 +56,10 @@ public:
         return data;
     };
 
-    static Ref<WorldgenBilinearArray> create(Vector<float> p_data, int p_dimension) {
-        Ref<WorldgenBilinearArray> heightmap;
+    static Ref<BilinearVector> create(Vector<float> p_data, int p_dimension) {
+        Ref<BilinearVector> heightmap;
         heightmap.instantiate();
-        ERR_FAIL_COND_V((p_dimension*p_dimension) != p_data.size(), Ref<WorldgenBilinearArray>());
+        ERR_FAIL_COND_V((p_dimension*p_dimension) != p_data.size(), Ref<BilinearVector>());
         
         heightmap->data = p_data;
         heightmap->dimension = p_dimension;
@@ -69,8 +71,8 @@ public:
         return dimension;
     }
 
-    static Ref<WorldgenBilinearArray> create_xy(int p_dimension) {
-        Ref<WorldgenBilinearArray> heightmap;
+    static Ref<BilinearVector> create_xy(int p_dimension) {
+        Ref<BilinearVector> heightmap;
         heightmap.instantiate();
         
         heightmap->data.resize(p_dimension*p_dimension);
@@ -80,4 +82,43 @@ public:
     }
 };
 
-#endif // HEIGHTMAP_H
+class WorldBoundBilinearArray : public RefCounted {
+    Ref<BilinearVector> bilinear_array;
+
+    float pixel_size;
+    float half_pixel_size;
+    Rect2 bounds;
+
+    _FORCE_INLINE_ Vector2 remap_uv(const Vector2 &p_world_position) const {
+        const Vector2 bounds_end = bounds.get_end();
+        Vector2 remapped_uv;
+        remapped_uv.x = Math::remap(p_world_position.x, bounds.position.x, bounds_end.x, 0.0f, 1.0f);
+        remapped_uv.y = Math::remap(p_world_position.y, bounds.position.y, bounds_end.y, 0.0f, 1.0f);
+        remapped_uv *= 1.0 - pixel_size;
+        remapped_uv += Vector2(half_pixel_size, half_pixel_size);
+        return remapped_uv * bilinear_array->get_dimension();
+    }
+public:
+    static Ref<WorldBoundBilinearArray> create(int p_dimension, Rect2 p_bounds) {
+        Ref<WorldBoundBilinearArray> out;
+        out.instantiate();
+
+        out->bilinear_array = BilinearVector::create_xy(p_dimension);
+
+        out->pixel_size = 1.0 / (float)p_dimension;
+        out->half_pixel_size = 0.5 / (float)p_dimension;
+        out->bounds = p_bounds;
+        return out;
+    }
+
+    float sample(Vector2 p_world_position) const {
+        ERR_FAIL_COND_V_MSG(!bounds.has_point(p_world_position), 0.0f, "Tried to sample out of bounds");
+        return bilinear_array->sample(remap_uv(p_world_position));
+    }
+
+    void set_pixel(Vector2i p_pixel, float p_value) {
+        bilinear_array->set_pixel(p_pixel, p_value);
+    }
+};
+
+#endif // BILINEAR_ARRAY_H

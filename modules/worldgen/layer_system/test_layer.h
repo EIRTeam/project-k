@@ -3,44 +3,26 @@
 
 #include "core/object/class_db.h"
 #include "core/object/ref_counted.h"
-#include "worldgen/layer_system/layer_manager.h"
-#include "worldgen/layer_system/terrain_layers.h"
-class TestLayer : public RefCounted {
-    GDCLASS(TestLayer, RefCounted);
-    Ref<ChunkerLayerManager> chunker;
-    TestLayer() {
-        chunker.instantiate();
-        Ref<HeightmapLayer> heightmap_layer;
-        heightmap_layer.instantiate();
+#include "scene/3d/camera_3d.h"
+#include "scene/3d/node_3d.h"
+#include "scene/main/node.h"
+#include "scene/main/viewport.h"
+#include "layer_manager.h"
+#include "quadtree_layer.h"
+#include "road_layer.h"
+#include "terrain_layers.h"
 
-        Ref<RoadLayer> road_layer;
-        road_layer.instantiate();
+class TestManager : public Node3D {
+    GDCLASS(TestManager, Node3D);
 
-        chunker->insert_layer(SNAME("Heightmap"), heightmap_layer);
-        chunker->insert_layer(SNAME("Road SDF"), road_layer);
-        chunker->add_layer_dependency(SNAME("Heightmap"), SNAME("Road SDF"));
-    }
+    ChunkerLayerManager *chunker = nullptr;
+    Ref<QuadTreeTerrainLayer> quadtree_layer;
+    Ref<HeightmapLayer> heightmap_layer;
+    Ref<RoadLayer> road_layer;
 
-    void test() {
-        chunker->update(Rect2(Vector2(0, 0), Vector2(1024, 1024)));
-    }
+    void _notification(int p_what);
 
-    static void _bind_methods() {
-        ClassDB::bind_method(D_METHOD("test"), &TestLayer::test);
-    }
-};
-
-class TestManager : public RefCounted {
-    GDCLASS(TestManager, RefCounted);
-
-    Ref<ChunkerLayerManager> chunker;
-    
-    void update_camera_position(Vector2 p_camera_position) {
-        const float render_distance = GLOBAL_GET("kgame/render_distance");
-        const float half_render_distance = render_distance * 0.5f;
-        Rect2 request_rect = Rect2(p_camera_position - Vector2(half_render_distance, half_render_distance), Vector2(render_distance, render_distance));
-        chunker->update(request_rect);
-    }
+    void update_camera_position(Vector2 p_camera_position);
 };
 
 #endif // TEST_LAYER_H

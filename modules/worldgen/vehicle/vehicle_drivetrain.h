@@ -12,7 +12,6 @@ class VehicleDrivetrain : public RefCounted {
   GDCLASS(VehicleDrivetrain, RefCounted);
   Ref<VehicleDrivetrainSettings> settings;
 
-  enum DifferentialState { LOCKED, SLIPPING, OPEN };
 
   int current_gear = 0;
   float reaction_torque = 0.0f;
@@ -32,6 +31,7 @@ protected:
   static void _bind_methods();
 
 public:
+  enum DifferentialState { LOCKED, SLIPPING, OPEN };
   Ref<VehicleDrivetrainSettings> get_settings() const { return settings; }
   void set_settings(const Ref<VehicleDrivetrainSettings> &settings_) {
     settings = settings_;

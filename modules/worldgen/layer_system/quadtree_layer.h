@@ -2,70 +2,43 @@
 #define QUADTREE_LAYER_H
 
 #include "core/math/rect2.h"
+#include "core/string/print_string.h"
 #include "layer_manager.h"
 #include "../thirdparty/taskflow/core/taskflow.hpp"
 #include "../plane_generate.h"
 #include "scene/3d/mesh_instance_3d.h"
 #include "worldgen/chunker.h"
+#include "worldgen/instance_texture_queue.h"
+#include "worldgen/layer_system/road_layer.h"
+
 class QuadTreeTerrainChunk;
+class HeightmapLayer;
 
 class QuadTreeTerrainLayer : public ChunkerLayer {
+    GDCLASS(QuadTreeTerrainLayer, ChunkerLayer);
     HashMap<BitField<PlaneGenerate::GridTJunctionRemovalFlags>, Ref<Mesh>> grid_meshes;
     Ref<ChunkerQuadTreeSettings> quad_tree_settings;
     Vector2 camera_position;
+    Ref<Material> terrain_material;
+    Ref<RoadLayer> road_layer;
 public:
-    QuadTreeTerrainLayer() {
-        quad_tree_settings.instantiate();
-        const float chunk_size = get_chunk_size();
-        quad_tree_settings->set_bounds(Rect2(Vector2(), Vector2(chunk_size, chunk_size)));
-
-        int tjunction_permutations[9] = {
-            (PlaneGenerate::GridTJunctionRemovalFlags)0,
-                PlaneGenerate::GridTJunctionRemovalFlags::UP,
-                PlaneGenerate::GridTJunctionRemovalFlags::DOWN,
-                PlaneGenerate::GridTJunctionRemovalFlags::LEFT,
-                PlaneGenerate::GridTJunctionRemovalFlags::RIGHT,
-                PlaneGenerate::GridTJunctionRemovalFlags::UP | PlaneGenerate::GridTJunctionRemovalFlags::RIGHT,
-                PlaneGenerate::GridTJunctionRemovalFlags::DOWN | PlaneGenerate::GridTJunctionRemovalFlags::LEFT,
-                PlaneGenerate::GridTJunctionRemovalFlags::LEFT | PlaneGenerate::GridTJunctionRemovalFlags::UP,
-                PlaneGenerate::GridTJunctionRemovalFlags::RIGHT | PlaneGenerate::GridTJunctionRemovalFlags::DOWN,
-        };
-
-        PlaneGenerate::GridMeshSettings mesh_settings = {
-            .element_count = 32,
-            .side_length = 1.0,  
-        };
-
-        for (int perm : tjunction_permutations) {
-            PlaneGenerate::GridMesh mesh;
-            PlaneGenerate::generate_mesh(mesh_settings, perm, mesh);
-            Array mesh_arr;
-            mesh_arr.resize(RS::ARRAY_MAX);
-            mesh_arr[RS::ARRAY_INDEX] = mesh.indices;
-            mesh_arr[RS::ARRAY_VERTEX] = mesh.positions;
-            mesh_arr[RS::ARRAY_TEX_UV] = mesh.uvs;
-            mesh.normals.resize(mesh.positions.size());
-            mesh.normals.fill(Vector3(0.0f, 1.0f, 0.0f));
-            mesh_arr[RS::ARRAY_NORMAL] = mesh.normals;
-
-            Ref<ArrayMesh> gpu_mesh;
-            gpu_mesh.instantiate();
-            gpu_mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, mesh_arr);
-            grid_meshes.insert(perm, gpu_mesh);
-        }
-    }
+    QuadTreeTerrainLayer(Ref<RoadLayer> p_road_layer);
     virtual float get_chunk_size() const override {
-        return 4096.0f;
+        return 2048.0f;
     }
-    Vector2 get_camera_position() const { return camera_position; }
-    void set_camera_position(const Vector2 &camera_position_) { camera_position = camera_position_; }
+    virtual Ref<ChunkerChunk> create_chunk() const  override;
+    Vector2 get_camera_position() const;
+    void set_camera_position(const Vector2 &p_camera_position);
+    void update_terrain_chunks();
     friend class QuadTreeTerrainChunk;
 };
 
 class QuadTreeTerrainChunk : public ChunkerChunk {
+    GDCLASS(QuadTreeTerrainChunk, ChunkerChunk);
     QuadTreeTerrainLayer *layer = nullptr;
     Ref<ChunkerQuadTree> quad_tree;
     Vector2 camera_position;
+    Node3D *chunk_node = nullptr;
 
     struct GridNode {
         MeshInstance3D *mi = nullptr;
@@ -74,18 +47,11 @@ class QuadTreeTerrainChunk : public ChunkerChunk {
     };
 
     HashMap<Rect2, GridNode> loaded_grid_nodes;
-
-    QuadTreeTerrainChunk(QuadTreeTerrainLayer *p_layer) {
-        layer = p_layer;
-        quad_tree.instantiate(layer->quad_tree_settings);
-    }
-    virtual void build(tf::Taskflow &p_taskflow) override {
-        camera_position = layer->get_camera_position();
-        p_taskflow.emplace([&]() {
-            quad_tree->clear();
-            quad_tree->insert_camera(camera_position);
-        }).name("Regenerate quadtree");
-    }
+public:
+    QuadTreeTerrainChunk(QuadTreeTerrainLayer *p_layer);
+    void update_quadtree();
+    void update_mesh_instances();
+    virtual void build(tf::Taskflow &p_taskflow) override;
 
     static BitField<PlaneGenerate::GridTJunctionRemovalFlags> get_tjunction_mesh_flags(int p_lod, ChunkerQuadTree::NeighborLODs p_lods) {
         BitField<PlaneGenerate::GridTJunctionRemovalFlags> flags;
@@ -109,26 +75,14 @@ class QuadTreeTerrainChunk : public ChunkerChunk {
         return layer->grid_meshes[get_tjunction_mesh_flags(p_lod, p_neighbor_lods)];
     }
 
-    virtual void on_build_completed() override {
-        // Find which grid nodes we have, and see if we need to swap the mesh
-        Vector<ChunkerQuadTree::LeafNodeInfo> node_infos = quad_tree->get_leaf_node_infos();
-        HashSet<Rect2> node_bounds;
-        Vector<int> nodes_to_create;
-        for (int i = 0; node_infos.size(); i++) {
-            node_bounds.insert(node_infos[i].bounds);
-            HashMap<Rect2, GridNode>::Iterator it = loaded_grid_nodes.find(node_infos[i].bounds);
-            if (it == loaded_grid_nodes.end()) {
-                nodes_to_create.push_back(i);
-                continue;
-            }
-
-            // We already have this node, see if we have to change the mesh due to LOD differences
-            Ref<Mesh> new_mesh = get_mesh_for_lods(node_infos[i].lod_level, node_infos[i].neighbor_lods);
-            if (new_mesh != it->value.mi->get_mesh()) {
-                it->value.mi->set_mesh(new_mesh);
-            }
-        }
+    void unload_grid_node(const GridNode &p_grid_node) {
+        p_grid_node.mi->queue_free();
     }
+
+    virtual void unload() override;
+
+    virtual void on_build_completed() override;
+    friend class QuadTreeTerrainLayer;
 };
 
 #endif // QUADTREE_LAYER_H

@@ -39,6 +39,7 @@ public:
         Point point;
         double mass = 0.0f;
         bool is_city = false;
+        float height = 0.0f;
     };
 
     struct Edge {
@@ -56,7 +57,7 @@ public:
     void insert_edge(Edge p_edge);
     int get_vertex_count() const;
 
-    std::vector<int> pathfind(int p_a_node, int p_b_node, const std::vector<std::vector<float>>& p_weight, float p_alpha);
+    std::vector<int> pathfind(int p_a_node, int p_b_node, const std::vector<std::vector<float>>& p_weight, float p_alpha, float p_height_weight = 100.0f);
 
     const std::vector<Vertex> &get_vertices() const;
     const std::vector<Edge> &get_edges() const;
@@ -76,8 +77,14 @@ private:
     RoadGraph road_graph;
     AlphaModelRoadGeneratorSettings settings;
     std::vector<RoadGraph::Vertex> cities;
+    bool initialized = false;
+protected:
+    virtual float get_height(float p_x, float p_y) const {
+        return 0.0f;
+    }
 public:
-    AlphaModelRoadGenerator(AlphaModelRoadGeneratorSettings p_settings, const std::vector<RoadGraph::Vertex> &p_cities);
+    AlphaModelRoadGenerator() {};
+    void initialize(AlphaModelRoadGeneratorSettings p_settings, const std::vector<RoadGraph::Vertex> &p_cities);
 
     struct RoadGenerationOutput {
         std::vector<RoadGraph::Vertex> vertices;
@@ -88,8 +95,12 @@ public:
     struct RoadGenerationSettings {
         float road_straightening_factor = 0.9f;
         float alpha = 0.7f;
+        float heightmap_weight = 100.0f;
     };
+    float heightmap_weight = 100.0f;
     void generate_roads(const RoadGenerationSettings p_settings, RoadGenerationOutput &p_output);
+
+    virtual ~AlphaModelRoadGenerator() {};
 };
 
 

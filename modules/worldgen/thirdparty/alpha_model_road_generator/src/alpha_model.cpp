@@ -33,7 +33,7 @@ int RoadGraph::get_vertex_count() const {
 }
 
 // Dijkstra-based pathfinding function
-std::vector<int> RoadGraph::pathfind(int p_a_node, int p_b_node, const std::vector<std::vector<float>>& p_weight, float p_alpha) {
+std::vector<int> RoadGraph::pathfind(int p_a_node, int p_b_node, const std::vector<std::vector<float>>& p_weight, float p_alpha, float p_height_weight) {
     // Priority queue to store (cost, vertex index), sorted by lowest cost
     using PQElement = std::pair<double, int>;
     std::priority_queue<PQElement, std::vector<PQElement>, std::greater<PQElement>> frontier;
@@ -61,6 +61,11 @@ std::vector<int> RoadGraph::pathfind(int p_a_node, int p_b_node, const std::vect
         for (int edge_index : adjacent_edges[current]) {
             const Edge& edge = edges[edge_index];
             int next_node = (edge.v1 == current) ? edge.v2 : edge.v1;
+            float height_v1 = vertices[edge.v1].height;
+            float height_v2 = vertices[edge.v2].height;
+            float m = (edge.length*edge.length) + p_height_weight * (height_v1 - height_v2);
+            
+            float d = std::pow(m*m, 0.5f);
 
             float coeff = 1.0f;
 
@@ -68,7 +73,7 @@ std::vector<int> RoadGraph::pathfind(int p_a_node, int p_b_node, const std::vect
                 coeff = p_alpha;
             }
 
-            float weight = (edge.length * edge.length) * coeff;
+            float weight = d * coeff;
 
             double new_cost = cost_so_far[current] + weight;
 
@@ -147,7 +152,12 @@ std::vector<HaltonPoint> map_to_bounding_box(const std::vector<HaltonPoint> &poi
   }
   return mappedPoints;
 }
-AlphaModelRoadGenerator::AlphaModelRoadGenerator(AlphaModelRoadGeneratorSettings p_settings, const std::vector<RoadGraph::Vertex> &p_cities) {
+
+void AlphaModelRoadGenerator::initialize(AlphaModelRoadGeneratorSettings p_settings, const std::vector<RoadGraph::Vertex> &p_cities) {
+    if (initialized) {
+        return;
+    }
+    initialized = true;
     settings = p_settings;
 
     for (const RoadGraph::Vertex &v : p_cities) {
@@ -158,8 +168,10 @@ AlphaModelRoadGenerator::AlphaModelRoadGenerator(AlphaModelRoadGeneratorSettings
             continue;
         }
 
-        cities.push_back(v);
-        road_graph.insert_vertex(v);
+        RoadGraph::Vertex v2 = v;
+        v2.height = get_height(v.point.x, v.point.y);
+        cities.push_back(v2);
+        road_graph.insert_vertex(v2);
     }
 
     // Generate dummy points
@@ -181,7 +193,8 @@ AlphaModelRoadGenerator::AlphaModelRoadGenerator(AlphaModelRoadGeneratorSettings
                 .point = RoadGraph::Point {
                     .x = p_point.x,
                     .y = p_point.y
-                }
+                },
+                .height = get_height(p_point.x, p_point.y)
             });
         }
 
@@ -202,6 +215,7 @@ AlphaModelRoadGenerator::AlphaModelRoadGenerator(AlphaModelRoadGeneratorSettings
             });
         }
     }
+
 }
 
 void AlphaModelRoadGenerator::generate_roads(RoadGenerationSettings p_settings, RoadGenerationOutput &p_output) {
@@ -236,7 +250,7 @@ void AlphaModelRoadGenerator::generate_roads(RoadGenerationSettings p_settings, 
     std::vector<std::vector<float>> is_road(vertex_count, std::vector<float>(vertex_count, 0.0f));
 
     for (int i = 0; i < number_of_trips.size(); i++) {
-        std::vector<int> path = road_graph.pathfind(number_of_trips[i].city_a, number_of_trips[i].city_b, is_road, p_settings.alpha);
+        std::vector<int> path = road_graph.pathfind(number_of_trips[i].city_a, number_of_trips[i].city_b, is_road, p_settings.alpha, p_settings.heightmap_weight);
         for (int j = 0; j < path.size()-1; j++) {
             int curr = path[j];
             int next = path[j+1];

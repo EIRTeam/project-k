@@ -83,7 +83,7 @@ float VehicleSuspensionCorner::apply_forces(RigidBody3D *p_car,
   prev_pos = get_global_transform().origin;
 
   // TODO: add different surface support
-  float surface_mu = 0.85;
+  float surface_mu = 0.75f;
 
   const float spring_length = suspension_settings->get_spring_travel();
 
@@ -213,8 +213,6 @@ void VehicleSuspensionCorner::set_rolling_resistance(
 }
 
 float VehicleSuspensionCorner::get_wheel_inertia() const {
-  const float tire_radius =
-      suspension_settings->get_tire_settings()->get_tire_radius();
-  return 0.5f * suspension_settings->get_wheel_mass() * tire_radius *
-         tire_radius;
+  const float tire_radius = suspension_settings->get_tire_settings()->get_tire_radius();
+  return 0.5f * suspension_settings->get_wheel_mass() * tire_radius * tire_radius;
 }

@@ -1,7 +1,10 @@
 #include "layer_manager.h"
+#include "core/error/error_macros.h"
+#include "core/string/print_string.h"
 
 void ChunkerLayerManager::insert_layer(StringName p_layer_name, Ref<ChunkerLayer> p_layer) {
     DEV_ASSERT(!layer_name_map.has(p_layer_name));
+    p_layer->manager = this;
     layers.push_back({
         .layer = p_layer,
         .name = p_layer_name
@@ -31,6 +34,12 @@ void ChunkerLayerManager::propagate_layer_chunks_up(size_t p_layer, Rect2 p_requ
         tasks[p_layer].chunks_to_build.insert(requested_chunk.chunk);
     }
     
+    if (tasks[p_layer].total_requested_region == Rect2()) {
+        tasks[p_layer].total_requested_region = p_requested_region;
+    } else {
+        tasks[p_layer].total_requested_region = tasks[p_layer].total_requested_region.merge(p_requested_region);
+    }
+
     for (const size_t &parent : layers[p_layer].parents) {
         propagate_layer_chunks_up(parent, bounds_for_parent);
     }
@@ -66,11 +75,21 @@ void ChunkerLayerManager::build(Rect2 p_user_requested_region) {
         for (const Vector2i &chunk : tasks[layer_i].chunks_to_build) {
             Ref<ChunkerChunk> chunk_instance = layers[layer_i].layer->create_chunk();
             chunk_instance->bounds = Rect2(CHUNK_SIZE * Vector2(chunk), Vector2(CHUNK_SIZE, CHUNK_SIZE));
+            chunk_instance->chunk = chunk;
             tasks[layer_i].chunks_being_built.push_back(chunk_instance);
             chunk_instance->build(tasks[layer_i].chunk_taskflows[chunk_taskflow_i]);
-            tasks[layer_i].layer_taskflow.composed_of(tasks[layer_i].chunk_taskflows[chunk_taskflow_i]).name(
+
+            tf::Task chunk_task = tasks[layer_i].layer_taskflow.composed_of(tasks[layer_i].chunk_taskflows[chunk_taskflow_i]).name(
                 layer_name_std + " Chunk (" + std::to_string(chunk.x) + ", " + std::to_string(chunk.y) + ")"
             );
+
+            tf::Task store_chunk_task = tasks[layer_i].layer_taskflow.emplace([this, layer_i, chunk_instance]() {
+                layers[layer_i].layer->loaded_chunks.insert(chunk_instance->chunk, chunk_instance);
+            }).name("Store chunk");
+
+            chunk_task.precede(store_chunk_task);
+
+
 
             chunk_taskflow_i++;
         }
@@ -79,15 +98,16 @@ void ChunkerLayerManager::build(Rect2 p_user_requested_region) {
 
     // Now connect all of them
     for (size_t layer_i = 0; layer_i < layers.size(); layer_i++) {
-        if (layers[layer_i].children.size() != 0) {
-            continue;
-        }
         propagate_layer_taskflow_dependencies_up(layer_i);
     }
 
     std::string graph = taskflow.dump();
     Ref<FileAccess> fa = FileAccess::open("res://flowmap.txt", FileAccess::WRITE);
     fa->store_string(graph.c_str());
+    fa->flush();
+    if (taskflow.empty()) {
+        return;
+    }
     current_future = executor.run(taskflow);
 }
 
@@ -95,7 +115,7 @@ void ChunkerLayerManager::on_build_task_completed() {
     current_future = tf::Future<void>();
     for (size_t layer_i = 0; layer_i < layers.size(); layer_i++) {
         for (Ref<ChunkerChunk> chunk : tasks[layer_i].chunks_being_built) {
-            layers[layer_i].layer->loaded_chunks.insert(chunk->chunk, chunk);
+            chunk->on_build_completed();
         }
     }
 }
@@ -109,6 +129,23 @@ void ChunkerLayerManager::update(Rect2 p_user_requested_region) {
     }
 
     build(p_user_requested_region);
+    cleanup_chunks();
+}
+
+void ChunkerLayerManager::cleanup_chunks() {
+    for (size_t i = 0; i < layers.size(); i++) {
+        LocalVector<Vector2i> chunks_to_unload;
+        for (KeyValue<Vector2i, Ref<ChunkerChunk>> chunk : layers[i].layer->loaded_chunks) {
+            if (!chunk.value->bounds.intersects(tasks[i].total_requested_region)) {
+                chunks_to_unload.push_back(chunk.value->chunk);
+            }
+        }
+        layers[i].layer->unload_chunks(chunks_to_unload);
+    }
+}
+
+ChunkerLayerManager* ChunkerLayer::get_manager() const {
+    return manager;
 }
 
 LocalVector<ChunkerLayer::RequestedChunk> ChunkerLayer::get_requested_chunks(Rect2 &p_user_requested_region) const {
@@ -130,4 +167,13 @@ LocalVector<ChunkerLayer::RequestedChunk> ChunkerLayer::get_requested_chunks(Rec
         }
     }
     return chunks;
+}
+
+void ChunkerLayer::unload_chunks(const LocalVector<Vector2i> &p_chunks_to_unload) {
+    for (Vector2i chunk : p_chunks_to_unload) {
+        DEV_ASSERT(loaded_chunks.has(chunk));
+        print_line("UNLOAD CHUNK!", chunk, get_class_name());
+        loaded_chunks[chunk]->unload();
+        loaded_chunks.erase(chunk);
+    }
 }
