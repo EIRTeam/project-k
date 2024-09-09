@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+
+import tracy_header_builder
+
+Import("env")
+Import("env_modules")
+
+env_tracy = env_modules.Clone()
+
+module_obj = []
+thirdparty_obj = []
+thirdparty_dir = "thirdparty/tracy/public/"
+
+thirdparty_sources = ["TracyClient.cpp"]
+
+thirdparty_sources = [thirdparty_dir + file for file in thirdparty_sources]
+
+env_tracy.Prepend(CPPPATH=[thirdparty_dir])
+
+tracy_defines = []
+
+if ARGUMENTS.get("tracy_enabled", "no") == "yes":
+    tracy_defines = ["TRACY_ENABLE", "TRACY_ONLY_IPV4", "TRACY_NO_SAMPLING"]
+    env_tracy.Append(CPPDEFINES=tracy_defines)
+
+env_thirdparty = env_tracy.Clone()
+env_thirdparty.disable_warnings()
+env_thirdparty.add_source_files(module_obj, thirdparty_sources)
+
+env.modules_sources += thirdparty_obj
+
+env_tracy.add_source_files(module_obj, "*.cpp")
+
+env.modules_sources += module_obj
+
+# Needed to force rebuilding the module files when the thirdparty library is updated.
+env_tracy.Depends("tracy.gen.h", env_tracy.Value(tracy_defines))
+env_tracy.CommandNoCache(
+    ["tracy.gen.h"],
+    "tracy_header_builder.py",
+    env_tracy.Run(tracy_header_builder.make_tracy_header),
+)
+
+env.Depends(module_obj, thirdparty_obj)
