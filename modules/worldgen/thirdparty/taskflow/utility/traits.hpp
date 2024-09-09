@@ -186,7 +186,7 @@ struct stateful_index {
 
   using TB = std::decay_t<unwrap_ref_decay_t<B>>;
   using TE = std::decay_t<unwrap_ref_decay_t<E>>;
-  using TSTEP = std::decay_t<unwrap_ref_decay_t<S>>;
+  using TS = std::decay_t<unwrap_ref_decay_t<S>>;
 
   static_assert(
     std::is_integral_v<TB>, "decayed beg index must be an integral type"
@@ -197,11 +197,11 @@ struct stateful_index {
   );
 
   static_assert(
-    std::is_integral_v<TSTEP>, "decayed step must be an integral type"
+    std::is_integral_v<TS>, "decayed step must be an integral type"
   );
 
   static_assert(
-    std::is_same_v<TB, TE> && std::is_same_v<TE, TSTEP>,
+    std::is_same_v<TB, TE> && std::is_same_v<TE, TS>,
     "decayed index and step types must match"
   );
 

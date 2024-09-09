@@ -899,6 +899,7 @@ GodotImGui::~GodotImGui() {
 	if (vertex_buffer.is_valid()) {
 		rd->free(vertex_buffer);
 	}
+	IM_FREE(ImGui::GetIO().BackendPlatformUserData);
 	ImGui::GetIO().BackendPlatformUserData = nullptr;
 	ImGui::DestroyContext();
 }

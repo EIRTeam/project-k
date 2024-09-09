@@ -1,4 +1,4 @@
-#include "terrain_layers.h"
+#include "heightmap_layer.h"
 #include "core/error/error_macros.h"
 #include "core/string/print_string.h"
 #include "worldgen/bilinear_array.h"
@@ -6,12 +6,6 @@
 Ref<HeightmapChunk> HeightmapLayer::get_chunk_at_world_position(Vector2 p_world_position) const {
     const Vector2i chunk = Vector2(p_world_position / get_chunk_size()).floor();
     HashMap<Vector2i, Ref<ChunkerChunk>>::ConstIterator it = loaded_chunks.find(chunk);
-    if (it == loaded_chunks.end()) {
-        for (const KeyValue<Vector2i, Ref<ChunkerChunk>> &chunk_kv : loaded_chunks) {
-            print_line(chunk_kv.key, chunk);
-        }
-        print_line("COCK2");
-    }
     ERR_FAIL_COND_V_MSG(it == loaded_chunks.end(), Ref<HeightmapChunk>(), "Tried to get chunk at position that doesn't exist");
     return it->value;
 }
@@ -36,12 +30,20 @@ void HeightmapLayer::sample_height_with_derivative_at_position(Vector2 p_world_p
     r_derivative.y = slope_z;
 }
 
-Ref<ChunkerChunk> HeightmapLayer::create_chunk() const {
+Ref<ChunkerChunk> HeightmapLayer::create_chunk(int p_lod_level) const {
     Ref<HeightmapChunk> chunk;
-    chunk.instantiate();
+    chunk.instantiate(biomes_layer);
     return chunk;
 }
 
+HeightmapLayer::HeightmapLayer(Ref<BiomeVoronoiTriangulationLayer> p_biomes_layer) {
+    biomes_layer = p_biomes_layer;
+}
+
 float HeightmapLayer::get_chunk_size() const {
-    return 2048.0f;
+    return GLOBAL_GET("kgame/terrain/terrain_chunk_size");
+}
+
+float HeightmapLayer::get_chunk_padding() const {
+    return 1024.0f;
 }

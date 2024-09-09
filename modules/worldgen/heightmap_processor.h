@@ -48,6 +48,7 @@ class HeightmapProcessor : public Node {
 
     void _notification(int p_what);
     void _render_callback(const RenderingServer::CompositorEffectCallbackType &p_callback_type, RenderDataRD *p_render_data);
+    void _init_render();
 
 protected:
     static void _bind_methods();

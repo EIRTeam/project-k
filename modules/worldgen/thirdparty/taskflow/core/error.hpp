@@ -5,6 +5,7 @@
 #include <exception>
 
 #include "../utility/stream.hpp"
+#include "core/string/print_string.h"
 
 namespace tf {
 
@@ -17,7 +18,10 @@ void throw_re(const char* fname, const size_t line, ArgsT&&... args) {
   oss << "[" << fname << ":" << line << "] ";
   //ostreamize(oss, std::forward<ArgsT>(args)...);
   (oss << ... << args);
-  //throw std::runtime_error(oss.str());
+  std::string std_str = oss.str();
+  std::cout << std_str << std::endl;
+  String str = String(std_str.c_str());
+  print_line("THROW!", str);
 }
 
 }  // ------------------------------------------------------------------------

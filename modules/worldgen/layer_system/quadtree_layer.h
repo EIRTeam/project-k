@@ -19,14 +19,14 @@ class QuadTreeTerrainLayer : public ChunkerLayer {
     HashMap<BitField<PlaneGenerate::GridTJunctionRemovalFlags>, Ref<Mesh>> grid_meshes;
     Ref<ChunkerQuadTreeSettings> quad_tree_settings;
     Vector2 camera_position;
-    Ref<Material> terrain_material;
+    LocalVector<Ref<Material>> terrain_materials_per_lod;
     Ref<RoadLayer> road_layer;
 public:
     QuadTreeTerrainLayer(Ref<RoadLayer> p_road_layer);
     virtual float get_chunk_size() const override {
-        return 2048.0f;
+        return GLOBAL_GET("kgame/terrain/terrain_chunk_size");
     }
-    virtual Ref<ChunkerChunk> create_chunk() const  override;
+    virtual Ref<ChunkerChunk> create_chunk(int p_lod_level) const  override;
     Vector2 get_camera_position() const;
     void set_camera_position(const Vector2 &p_camera_position);
     void update_terrain_chunks();
@@ -39,6 +39,7 @@ class QuadTreeTerrainChunk : public ChunkerChunk {
     Ref<ChunkerQuadTree> quad_tree;
     Vector2 camera_position;
     Node3D *chunk_node = nullptr;
+    Ref<Material> material;
 
     struct GridNode {
         MeshInstance3D *mi = nullptr;

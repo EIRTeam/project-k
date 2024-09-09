@@ -21,6 +21,6 @@ if(TF_CUDA_GET_FIRST(__VA_ARGS__) != cudaSuccess) {              \
       << (cudaGetErrorString(__ev__)) << " ("                    \
       << (cudaGetErrorName(__ev__)) << ") - ";                   \
   tf::ostreamize(oss, TF_CUDA_REMOVE_FIRST(__VA_ARGS__));        \
-  throw std::runtime_error(oss.str());                           \
+  //throw std::runtime_error(oss.str());                           \
 }
 

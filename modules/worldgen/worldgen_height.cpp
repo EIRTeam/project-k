@@ -4,17 +4,8 @@
 #include "scene/resources/curve.h"
 
 float WorldgenHeight::get_height(const Vector2 &p_position) const {
-    float G = exp2(-1);
     float f = settings->get_frequency();
-    float a = settings->get_base_amplitude();
-    float t = 0.0;
-    for (int i = 0 ; i < settings->get_octaves(); i++) {
-        t += a*fnl->get_noise_2dv(f*p_position);
-        f *= 2.0;
-        a *= G;
-    }
-
-    t = (t) * 0.5f + 0.5f; 
+    float t = settings->get_noise()->get_noise_2dv(p_position * f) * 0.5f + 0.5f; 
 
     const Ref<Curve> height_curve = settings->get_height_curve();
     const float height_multiplier = settings->get_height_multiplier();
@@ -84,6 +75,10 @@ void WorldgenHeightSettings::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_height_multiplier"), &WorldgenHeightSettings::get_height_multiplier);
     ClassDB::bind_method(D_METHOD("set_height_multiplier", "height_multiplier"), &WorldgenHeightSettings::set_height_multiplier);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "height_multiplier"), "set_height_multiplier", "get_height_multiplier");
+    
+    ClassDB::bind_method(D_METHOD("get_noise"), &WorldgenHeightSettings::get_noise);
+    ClassDB::bind_method(D_METHOD("set_noise", "noise"), &WorldgenHeightSettings::set_noise);
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "noise", PROPERTY_HINT_RESOURCE_TYPE, "FastNoiseLite"), "set_noise", "get_noise");
 }
 
 float WorldgenHeightSettings::get_frequency() const {
@@ -111,3 +106,7 @@ void WorldgenHeightSettings::set_height_curve(Ref<Curve> p_height_curve) {
 }
 
 void WorldgenHeightSettings::set_height_multiplier(float p_height_multiplier) { height_multiplier = p_height_multiplier; }
+
+Ref<FastNoiseLite> WorldgenHeightSettings::get_noise() const { return noise; }
+
+void WorldgenHeightSettings::set_noise(Ref<FastNoiseLite> p_noise) { noise = p_noise; }

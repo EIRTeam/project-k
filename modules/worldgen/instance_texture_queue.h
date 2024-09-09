@@ -13,6 +13,7 @@ class InstanceTextureQueue : public RefCounted {
 
     List<int> available_uniform_indices;
     int image_count;
+    int texture_dimensions;
 public:
     StringName uniform_name;
     struct InstanceTextureQueueCreateParams {
@@ -29,6 +30,7 @@ public:
     void upload_image(int p_idx, Ref<Image> p_image) const;
     void release_idx(int p_idx);
     Ref<Texture2DArray> get_texture() const;
+    int get_texture_dimensions() const;
 };
 
 class InstanceTextureHandle : public RefCounted {
@@ -37,6 +39,7 @@ class InstanceTextureHandle : public RefCounted {
 public:
     int get_idx() const;
     void upload_image(Ref<Image> p_image) const;
+    int get_texture_dimensions() const;
     InstanceTextureHandle(Ref<InstanceTextureQueue> p_queue, int p_idx);
     ~InstanceTextureHandle();
 };

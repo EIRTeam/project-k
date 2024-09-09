@@ -23,6 +23,7 @@ void HeightmapProcessor::_notification(int p_what) {
                 return;
             }
 
+
             top_down_camera = memnew(Camera3D);
             viewport = memnew(SubViewport);
 
@@ -45,46 +46,7 @@ void HeightmapProcessor::_notification(int p_what) {
             top_down_camera->set_cull_mask(RENDER_LAYER_TERRAIN);
 
             compositor_effect_data.compositor_effect = RenderingServer::get_singleton()->compositor_effect_create();
-            RenderingServer *rs = RenderingServer::get_singleton();
-            
-            rs->compositor_effect_set_callback(compositor_effect_data.compositor_effect, RenderingServer::COMPOSITOR_EFFECT_CALLBACK_TYPE_POST_OPAQUE, callable_mp(this, &HeightmapProcessor::_render_callback));
-
-            RD::TextureFormat texture_format = RD::TextureFormat();
-
-            texture_format.format = RenderingDeviceCommons::DATA_FORMAT_R32_SFLOAT;
-            texture_format.width = heightmap_texture_size;
-            texture_format.height = heightmap_texture_size;
-            texture_format.usage_bits = RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_SAMPLING_BIT;
-
-            RenderingDevice *rd = RenderingDevice::get_singleton();
-            // create RD data
-            compositor_effect_data.output_texture = rd->texture_create(texture_format, RD::TextureView());
-
-            rd->set_resource_name(compositor_effect_data.output_texture, "Wandering heightmap output texture");
-
-            compositor_effect_data.camera_matrices_buffer_rd = rd->uniform_buffer_create(sizeof(CameraMatricesBuffer));
-            compositor_effect_data.shader = rd->shader_create_from_spirv(shader_file->get_spirv_stages(), "Wandering heightmap shader");
-            compositor_effect_data.pipeline = rd->compute_pipeline_create(compositor_effect_data.shader);
-            
-            compositor_effect_data.push_constant.output_dimensions[0] = heightmap_texture_size;
-            compositor_effect_data.push_constant.output_dimensions[1] = heightmap_texture_size;
-
-            compositor_effect_data.sampler = rd->sampler_create(RD::SamplerState());
-
-            compositor_effect_data.x_groups = (heightmap_texture_size - 1) / 8 + 1;
-            compositor_effect_data.y_groups = (heightmap_texture_size - 1) / 8 + 1;
-            compositor_effect_data.z_groups = 1;
-
-            heightmap_texture_2d.instantiate();
-            heightmap_texture_2d->set_texture_rd_rid(compositor_effect_data.output_texture);
-
-            compositor_effect_data.compositor = rs->compositor_create();
-            
-            TypedArray<RID> effects;
-            effects.push_back(compositor_effect_data.compositor_effect);
-            
-            rs->compositor_set_compositor_effects(compositor_effect_data.compositor, effects);
-            rs->camera_set_compositor(top_down_camera->get_camera(), compositor_effect_data.compositor);
+            RS::get_singleton()->call_on_render_thread(callable_mp(this, &HeightmapProcessor::_init_render));
         } break;
     }
 }
@@ -121,6 +83,52 @@ void HeightmapProcessor::_render_callback(const RenderingServer::CompositorEffec
     rd->compute_list_bind_uniform_set(cl, uniform_set, 0);
     rd->compute_list_dispatch(cl, compositor_effect_data.x_groups, compositor_effect_data.y_groups, compositor_effect_data.z_groups);
     rd->compute_list_end();
+}
+
+void HeightmapProcessor::_init_render() {
+    uint32_t heightmap_texture_size = GLOBAL_GET("kgame/wandering_heightmap/texture_size");
+    RenderingServer *rs = RenderingServer::get_singleton();
+    
+    rs->compositor_effect_set_callback(compositor_effect_data.compositor_effect, RenderingServer::COMPOSITOR_EFFECT_CALLBACK_TYPE_POST_OPAQUE, callable_mp(this, &HeightmapProcessor::_render_callback));
+
+    RD::TextureFormat texture_format = RD::TextureFormat();
+
+    texture_format.format = RenderingDeviceCommons::DATA_FORMAT_R32_SFLOAT;
+    texture_format.width = heightmap_texture_size;
+    texture_format.height = heightmap_texture_size;
+    texture_format.usage_bits = RD::TEXTURE_USAGE_STORAGE_BIT | RD::TEXTURE_USAGE_SAMPLING_BIT;
+
+    RenderingDevice *rd = RenderingDevice::get_singleton();
+    // create RD data
+    compositor_effect_data.output_texture = rd->texture_create(texture_format, RD::TextureView());
+
+    rd->set_resource_name(compositor_effect_data.output_texture, "Wandering heightmap output texture");
+
+    compositor_effect_data.camera_matrices_buffer_rd = rd->uniform_buffer_create(sizeof(CameraMatricesBuffer));
+    compositor_effect_data.shader = rd->shader_create_from_spirv(shader_file->get_spirv_stages(), "Wandering heightmap shader");
+    compositor_effect_data.pipeline = rd->compute_pipeline_create(compositor_effect_data.shader);
+    
+    compositor_effect_data.push_constant.output_dimensions[0] = heightmap_texture_size;
+    compositor_effect_data.push_constant.output_dimensions[1] = heightmap_texture_size;
+
+    compositor_effect_data.sampler = rd->sampler_create(RD::SamplerState());
+
+    compositor_effect_data.x_groups = (heightmap_texture_size - 1) / 8 + 1;
+    compositor_effect_data.y_groups = (heightmap_texture_size - 1) / 8 + 1;
+    compositor_effect_data.z_groups = 1;
+
+    heightmap_texture_2d.instantiate();
+    heightmap_texture_2d->set_texture_rd_rid(compositor_effect_data.output_texture);
+
+    compositor_effect_data.compositor = rs->compositor_create();
+    
+    TypedArray<RID> effects;
+    effects.push_back(compositor_effect_data.compositor_effect);
+    
+    rs->compositor_set_compositor_effects(compositor_effect_data.compositor, effects);
+    rs->camera_set_compositor(top_down_camera->get_camera(), compositor_effect_data.compositor);
+
+    rs->global_shader_parameter_set("heightmap", heightmap_texture_2d);
 }
 
 void HeightmapProcessor::_bind_methods() {

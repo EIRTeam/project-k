@@ -3,11 +3,15 @@
 #include "core/config/project_settings.h"
 #include "core/object/class_db.h"
 #include "core/object/object.h"
+#include "core/variant/variant.h"
+#include "game_debugger.h"
+#include "layer_system/layer_debuger.h"
 #include "scene/resources/material.h"
 #include "worldgen/chunker.h"
 #include "worldgen/bilinear_array.h"
 #include "poisson_disk_sampling.h"
 #include "worldgen/heightmap_processor.h"
+#include "worldgen/layer_system/biome_layers.h"
 #include "worldgen/layer_system/test_layer.h"
 #include "worldgen/quadtree.h"
 #include "worldgen/road_astar.h"
@@ -45,6 +49,10 @@ void initialize_worldgen_module(ModuleInitializationLevel p_level) {
     GDREGISTER_CLASS(VehicleClutch);
     GDREGISTER_CLASS(TestManager);
     GDREGISTER_CLASS(WorldgenHeightSettings);
+    GDREGISTER_CLASS(BiomeGeneratorSettings);
+    GDREGISTER_CLASS(BiomeSettings);
+    GDREGISTER_CLASS(GameDebugger);
+    GDREGISTER_CLASS(ChunkerDebugger);
 
     GLOBAL_DEF("kgame/chunk_size", 32);
     GLOBAL_DEF("kgame/cull_quadtree_subdiv", 2);
@@ -55,9 +63,16 @@ void initialize_worldgen_module(ModuleInitializationLevel p_level) {
     GLOBAL_DEF("kgame/chunk_heightmap_size", 128);
     GLOBAL_DEF("kgame/render_distance", 2048.0f);
 
-    GLOBAL_DEF("kgame/terrain_normal_height_texture_size", 128);
-	GLOBAL_DEF(PropertyInfo(Variant::STRING, "kgame/terrain/terrain_material", PROPERTY_HINT_FILE, "*.tres,*.res"), "");
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, "kgame/terrain/terrain_base_material", PROPERTY_HINT_FILE, "*.tres,*.res"), "");
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, "kgame/terrain/terrain_shader", PROPERTY_HINT_FILE, "*.tres,*.res,*.gdshaderinc"), "");
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, "kgame/terrain/height_settings", PROPERTY_HINT_FILE, "*.tres,*.res"), "");
+	GLOBAL_DEF(PropertyInfo(Variant::STRING, "kgame/terrain/biome_settings", PROPERTY_HINT_FILE, "*.tres,*.res"), "");
+    
+    GLOBAL_DEF("kgame/terrain/normal_height_texture_size", 128);
+    GLOBAL_DEF(PropertyInfo(Variant::PACKED_FLOAT32_ARRAY, "kgame/terrain/lod_max_distances"), PackedFloat32Array());
+    GLOBAL_DEF(PropertyInfo(Variant::PACKED_INT32_ARRAY, "kgame/terrain/normal_height_texture_count_per_lod"), PackedInt32Array());
+    GLOBAL_DEF("kgame/terrain/normal_epsilon", 1.0f);
+    GLOBAL_DEF("kgame/terrain/terrain_chunk_size", 1024.0f);
 
 
     GLOBAL_DEF("kgame/wandering_heightmap/texture_size", 256);
@@ -68,6 +83,8 @@ void initialize_worldgen_module(ModuleInitializationLevel p_level) {
     GLOBAL_DEF("kgame/wind/windmap_resolution", 512);
     GLOBAL_DEF("kgame/roads/road_width", 10.0f);
     GLOBAL_DEF("kgame/roads/road_skirt", 5.0f);
+
+
     
     GLOBAL_DEF(PropertyInfo(Variant::OBJECT, "kgame/height_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"), Ref<Curve>());
 }

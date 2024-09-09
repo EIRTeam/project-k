@@ -8,6 +8,7 @@ class Curve;
 class WorldgenHeightSettings : public Resource {
     GDCLASS(WorldgenHeightSettings, Resource);
     Ref<Curve> height_curve;
+    Ref<FastNoiseLite> noise;
     float frequency = 0.15f;
     float base_amplitude = 1.0f;
     int octaves = 8;
@@ -33,6 +34,9 @@ public:
 
     float get_height_multiplier() const { return height_multiplier; }
     void set_height_multiplier(float p_height_multiplier);
+
+    Ref<FastNoiseLite> get_noise() const;
+    void set_noise(Ref<FastNoiseLite> p_noise);
 };
 
 class WorldgenHeight : public RefCounted {

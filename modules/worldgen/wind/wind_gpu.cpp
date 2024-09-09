@@ -6,6 +6,7 @@
 #include "servers/rendering/renderer_rd/uniform_set_cache_rd.h"
 #include "servers/rendering/rendering_device.h"
 #include "servers/rendering/rendering_device_commons.h"
+#include "servers/rendering_server.h"
 
 void WindProcessor::_notification(int p_what) {
     switch(p_what) {
@@ -14,35 +15,7 @@ void WindProcessor::_notification(int p_what) {
                 return;
             }
 
-            RD *rd = RD::get_singleton();
-
-            gpu_data.shader = rd->shader_create_from_spirv(shader_file->get_spirv_stages(), "Wind GPU compute");
-            
-            RD::TextureFormat texture_format;
-            int windmap_resolution = GLOBAL_GET("kgame/wind/windmap_resolution");
-            texture_format.width = windmap_resolution;
-            texture_format.height = windmap_resolution;
-            texture_format.format = RenderingDeviceCommons::DATA_FORMAT_R16G16B16A16_SFLOAT;
-            texture_format.usage_bits = RenderingDeviceCommons::TEXTURE_USAGE_STORAGE_BIT | RenderingDeviceCommons::TEXTURE_USAGE_SAMPLING_BIT;
-
-            gpu_data.output_texture = rd->texture_create(texture_format, RD::TextureView());
-            rd->set_resource_name(gpu_data.output_texture, "Wind map");
-
-            gpu_data.pipeline = rd->compute_pipeline_create(gpu_data.shader);
-            gpu_data.push_constant.output_dimensions[0] = windmap_resolution;
-            gpu_data.push_constant.output_dimensions[1] = windmap_resolution;
-
-            gpu_data.x_groups = (windmap_resolution - 1) / 8 + 1;
-            gpu_data.y_groups = (windmap_resolution - 1) / 8 + 1;
-            gpu_data.z_groups = 1;
-
-            output_texture.instantiate();
-            output_texture->set_texture_rd_rid(gpu_data.output_texture);
-
-            float windmap_radius = GLOBAL_GET("kgame/wind/windmap_radius");
-            pixel_world_size =  (windmap_radius * 2.0) / (float)windmap_resolution;
-            gpu_data.push_constant.physical_size = windmap_radius*2.0;
-            
+            RS::get_singleton()->call_on_render_thread(callable_mp(this, &WindProcessor::_init_render));            
         } break;
     }
 }
@@ -75,6 +48,38 @@ WindProcessor::~WindProcessor() {
     }
 }
 
+void WindProcessor::_init_render() {
+    RD *rd = RD::get_singleton();
+
+    gpu_data.shader = rd->shader_create_from_spirv(shader_file->get_spirv_stages(), "Wind GPU compute");
+    
+    RD::TextureFormat texture_format;
+    int windmap_resolution = GLOBAL_GET("kgame/wind/windmap_resolution");
+    texture_format.width = windmap_resolution;
+    texture_format.height = windmap_resolution;
+    texture_format.format = RenderingDeviceCommons::DATA_FORMAT_R16G16B16A16_SFLOAT;
+    texture_format.usage_bits = RenderingDeviceCommons::TEXTURE_USAGE_STORAGE_BIT | RenderingDeviceCommons::TEXTURE_USAGE_SAMPLING_BIT;
+
+    gpu_data.output_texture = rd->texture_create(texture_format, RD::TextureView());
+    rd->set_resource_name(gpu_data.output_texture, "Wind map");
+
+    gpu_data.pipeline = rd->compute_pipeline_create(gpu_data.shader);
+    gpu_data.push_constant.output_dimensions[0] = windmap_resolution;
+    gpu_data.push_constant.output_dimensions[1] = windmap_resolution;
+
+    gpu_data.x_groups = (windmap_resolution - 1) / 8 + 1;
+    gpu_data.y_groups = (windmap_resolution - 1) / 8 + 1;
+    gpu_data.z_groups = 1;
+
+    output_texture.instantiate();
+    output_texture->set_texture_rd_rid(gpu_data.output_texture);
+    RS::get_singleton()->global_shader_parameter_set("wind_map", output_texture);
+
+    float windmap_radius = GLOBAL_GET("kgame/wind/windmap_radius");
+    pixel_world_size =  (windmap_radius * 2.0) / (float)windmap_resolution;
+    gpu_data.push_constant.physical_size = windmap_radius*2.0;
+}
+
 void WindProcessor::dispatch() {
     RD *rd = RD::get_singleton();
     
@@ -91,6 +96,10 @@ void WindProcessor::dispatch() {
     rd->compute_list_dispatch(cl, gpu_data.x_groups, gpu_data.y_groups, gpu_data.z_groups);
     rd->compute_list_end();
     rd->draw_command_end_label();
+    RS *rs = RS::get_singleton();
+    rs->global_shader_parameter_set("wind_map_center", get_windmap_center());
+    float windmap_radius = GLOBAL_GET("kgame/wind/windmap_radius");
+    rs->global_shader_parameter_set("wind_map_side", windmap_radius);
 }
 
 Ref<RDShaderFile> WindProcessor::get_shader_file() const {

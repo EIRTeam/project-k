@@ -28,7 +28,8 @@ public:
     int get_site_count() const;
 
     PackedVector2Array get_site_edges(int p_site) const;
-    TypedArray<PackedInt32Array> get_site_triangles(int p_site) const;
+    TypedArray<PackedInt32Array> get_site_triangles_bind(int p_site) const;
+    Vector<PackedInt32Array> get_site_triangles(int p_site) const;
     Vector2 get_site_position(int p_site) const;
     void delaunay_iter_begin();
     Dictionary delaunay_iter_next();

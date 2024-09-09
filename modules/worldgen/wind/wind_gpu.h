@@ -45,6 +45,7 @@ protected:
     ~WindProcessor();
 
 public:
+    void _init_render();
     void dispatch();
     Ref<RDShaderFile> get_shader_file() const;
     void set_shader_file(const Ref<RDShaderFile> &p_shader_file);

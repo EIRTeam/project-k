@@ -1,13 +1,36 @@
 #include "quadtree_layer.h"
+#include "core/variant/variant.h"
 #include "scene/3d/node_3d.h"
-#include "terrain_layers.h"
+#include "heightmap_layer.h"
 #include "core/config/project_settings.h"
+#include "scene/resources/material.h"
+#include "scene/resources/shader.h"
+#include "servers/rendering_server.h"
 #include "worldgen/instance_texture_queue.h"
+#include "worldgen/render_layers.h"
 
 QuadTreeTerrainLayer::QuadTreeTerrainLayer(Ref<RoadLayer> p_road_layer) {
     road_layer = p_road_layer;
     quad_tree_settings.instantiate();
-    terrain_material = ResourceLoader::load(GLOBAL_GET("kgame/terrain/terrain_material"));
+
+    // Terrain shader variants
+    Ref<ShaderInclude> terrain_shader_inc = ResourceLoader::load(GLOBAL_GET("kgame/terrain/terrain_shader"));
+    String code =  terrain_shader_inc->get_code();
+    
+    int lod_count = PackedFloat32Array(GLOBAL_GET("kgame/terrain/lod_max_distances")).size();
+    Ref<ShaderMaterial> base_material = ResourceLoader::load(GLOBAL_GET("kgame/terrain/terrain_base_material"));
+    for (int i = 0; i < lod_count; i++) {
+        // Need me global constants
+        StringName shader_parameter_name = vformat("terrain_normal_heightmaps_lod_%d", i);
+        String lod_code = String(vformat("shader_type spatial;\n#define TERRAIN_NORMAL_HEIGHTMAPS_GLOBAL_UNIFORM %s\n", shader_parameter_name)) + code;
+        Ref<Shader> lod_shader;
+        lod_shader.instantiate();
+        lod_shader->set_code(lod_code);
+        Ref<ShaderMaterial> material = base_material->duplicate();
+        material->set_shader(lod_shader);
+        terrain_materials_per_lod.push_back(material);
+    }
+
     int tjunction_permutations[9] = {
         (PlaneGenerate::GridTJunctionRemovalFlags)0,
             PlaneGenerate::GridTJunctionRemovalFlags::UP,
@@ -40,14 +63,14 @@ QuadTreeTerrainLayer::QuadTreeTerrainLayer(Ref<RoadLayer> p_road_layer) {
         Ref<ArrayMesh> gpu_mesh;
         gpu_mesh.instantiate();
         gpu_mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, mesh_arr);
-        gpu_mesh->surface_set_material(0, terrain_material);
         grid_meshes.insert(perm, gpu_mesh);
     }
 }
 
-Ref<ChunkerChunk> QuadTreeTerrainLayer::create_chunk() const {
+Ref<ChunkerChunk> QuadTreeTerrainLayer::create_chunk(int p_lod_level) const {
     Ref<QuadTreeTerrainChunk> chunk;
     chunk.instantiate(const_cast<QuadTreeTerrainLayer*>(this));
+    chunk->material = terrain_materials_per_lod[p_lod_level];
     return chunk;
 }
 
@@ -120,7 +143,9 @@ void QuadTreeTerrainChunk::update_mesh_instances() {
         const ChunkerQuadTree::LeafNodeInfo &node_info = node_infos[node_i];
         Ref<Mesh> new_mesh = get_mesh_for_lods(node_info.lod_level, node_info.neighbor_lods);
         MeshInstance3D *mi = memnew(MeshInstance3D);
+        mi->set_layer_mask(RENDER_LAYER_TERRAIN);
         mi->set_mesh(get_mesh_for_lods(node_info.lod_level, node_info.neighbor_lods));
+        mi->set_material_override(material);
         chunk_node->add_child(mi);
         mi->set_global_position(Vector3(node_info.bounds.position.x, 0.0, node_info.bounds.position.y));
         AABB chunk_aabb;
@@ -156,5 +181,6 @@ void QuadTreeTerrainChunk::unload() {
 }
 
 void QuadTreeTerrainChunk::on_build_completed() {
+    
 }
 

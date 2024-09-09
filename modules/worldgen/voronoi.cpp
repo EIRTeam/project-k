@@ -14,7 +14,7 @@ void VoronoiGraph::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_site_edges", "site"), &VoronoiGraph::get_site_edges);
     ClassDB::bind_method(D_METHOD("delaunay_iter_begin"), &VoronoiGraph::delaunay_iter_begin);
     ClassDB::bind_method(D_METHOD("delaunay_iter_next"), &VoronoiGraph::delaunay_iter_next);
-    ClassDB::bind_method(D_METHOD("get_site_triangles", "site"), &VoronoiGraph::get_site_triangles);
+    ClassDB::bind_method(D_METHOD("get_site_triangles", "site"), &VoronoiGraph::get_site_triangles_bind);
     ClassDB::bind_method(D_METHOD("get_site_position", "site"), &VoronoiGraph::get_site_position);
 }
 
@@ -101,9 +101,22 @@ PackedVector2Array VoronoiGraph::get_site_edges(int p_site) const {
     return edges;
 }
 
-TypedArray<PackedInt32Array> VoronoiGraph::get_site_triangles(int p_site) const {
+TypedArray<PackedInt32Array> VoronoiGraph::get_site_triangles_bind(int p_site) const {
     ERR_FAIL_INDEX_V(p_site, diagram.numsites, TypedArray<PackedInt32Array>());
     TypedArray<PackedInt32Array> out;
+
+    for (size_t i = 0; i < site_triangles[p_site].size(); i++) {
+        PackedInt32Array arr;
+        arr.push_back(site_triangles[p_site][i].other_sites[0]);
+        arr.push_back(site_triangles[p_site][i].other_sites[1]);
+        out.push_back(arr);
+    }
+    return out;
+}
+
+Vector<PackedInt32Array> VoronoiGraph::get_site_triangles(int p_site) const {
+    ERR_FAIL_INDEX_V(p_site, diagram.numsites, Vector<PackedInt32Array>());
+    Vector<PackedInt32Array> out;
 
     for (size_t i = 0; i < site_triangles[p_site].size(); i++) {
         PackedInt32Array arr;
@@ -137,5 +150,6 @@ Dictionary VoronoiGraph::delaunay_iter_next() {
 }
 
 VoronoiGraph::~VoronoiGraph() {
+    print_line("FREE VOROGRAPH");
     jcv_diagram_free(&diagram);
 }
